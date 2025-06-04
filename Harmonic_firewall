@@ -1,0 +1,90 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# تعریف حالت سکوت به عنوان -1
+SILENCE = -1
+
+# ترکیب دو ورودی به توصیف معنایی
+def combine_bits(a, b):
+    if a == SILENCE and b == SILENCE:
+        return 'هیچ'
+    elif (a == 0 and b == 1) or (a == 1 and b == 0):
+        return 'تعامل'
+    elif (a == 0 and b == SILENCE) or (a == SILENCE and b == 0):
+        return 'نیمه فعال'
+    elif (a == 1 and b == SILENCE) or (a == SILENCE and b == 1):
+        return 'نیمه خاموش'
+    else:
+        return 'نامشخص'
+
+# تولید موج هارمونیک متناسب با نوع ترکیب
+def harmonic_wave(t, combo):
+    if combo == 'هیچ':
+        return np.zeros_like(t)
+    elif combo == 'تعامل':
+        return np.sin(2 * np.pi * 5 * t)
+    elif combo == 'نیمه فعال':
+        return 0.5 * np.sin(2 * np.pi * 3 * t)
+    elif combo == 'نیمه خاموش':
+        return 0.5 * np.sin(2 * np.pi * 7 * t)
+    else:
+        return np.zeros_like(t)
+
+# تعریف گره
+class Member:
+    def __init__(self, id, state):
+        self.id = id
+        self.state = state  # 0,1 یا SILENCE
+
+    def send_state(self):
+        return self.state
+
+# پیامبر شبکه برای تحلیل کلی
+class Prophet:
+    def __init__(self, members):
+        self.members = members
+
+    def collect_states(self):
+        return [m.send_state() for m in self.members]
+
+    def analyze(self):
+        states = self.collect_states()
+        combos = []
+        for i in range(len(states) - 1):
+            combos.append(combine_bits(states[i], states[i + 1]))
+        return combos
+
+    def harmonic_signal(self, t):
+        combos = self.analyze()
+        total_wave = np.zeros_like(t)
+        for c in combos:
+            total_wave += harmonic_wave(t, c)
+        return total_wave
+
+# دیواره آتش هارمونیک
+def is_harmonic_signal_valid(wave, threshold=0.1):
+    fft = np.fft.fft(wave)
+    freq_energy = np.abs(fft[1:len(fft)//2])
+    total_energy = np.sum(freq_energy)
+    return total_energy > threshold
+
+if __name__ == "__main__":
+    t = np.linspace(0, 1, 500)
+    members = [
+        Member(1, 0),
+        Member(2, 1),
+        Member(3, SILENCE),
+        Member(4, 0),
+        Member(5, 1),
+    ]
+    prophet = Prophet(members)
+    wave = prophet.harmonic_signal(t)
+    valid = is_harmonic_signal_valid(wave)
+
+    print("وضعیت سیگنال هارمونیک:", "معتبر" if valid else "نامعتبر")
+
+    plt.plot(t, wave)
+    plt.title("سیگنال هارمونیک کل شبکه")
+    plt.xlabel("زمان")
+    plt.ylabel("دامنه")
+    plt.show()
