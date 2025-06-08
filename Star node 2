@@ -1,0 +1,65 @@
+import numpy as np
+import random
+
+class StarNode:
+    def __init__(self, node_id, position, initial_paths):
+        self.id = node_id
+        self.position = position  # عدد برای شاخص ستاره‌ای (مثلاً فاصله از مرکز)
+        self.path_variability = initial_paths  # تعداد مسیرهای غیرتکراری دیده شده
+        self.responsiveness = 1.0  # مقدار اولیه پاسخ‌پذیری (0 تا 1)
+        self.expansion_alignment = random.uniform(0,1)  # هماهنگی با بردار رشد جدید
+        self.score = 0.0
+        self.quarantined = False
+        self.rewarded = False
+        self.response_delay = 0  # شمارنده تاخیر پاسخ
+
+    def update_score(self, alpha):
+        # alpha = (a1, a2, a3, a4)
+        V, R, S, E = self.path_variability, self.responsiveness, self.position, self.expansion_alignment
+        self.score = alpha[0]*V + alpha[1]*R + alpha[2]*S + alpha[3]*E
+
+    def evaluate_quarantine(self, redundancy_threshold=0.75, delay_threshold=3):
+        # فرض کنیم path_variability نسبت معکوسی با تکراری بودن دارد
+        redundancy = 1 - (self.path_variability / 10)  # 10 فرض تعداد کل مسیرها
+        if redundancy > redundancy_threshold or self.response_delay > delay_threshold or self.quarantined:
+            self.quarantined = True
+        else:
+            self.quarantined = False
+
+    def apply_reward(self):
+        if not self.quarantined and self.score > 3.5:
+            self.rewarded = True
+        else:
+            self.rewarded = False
+
+    def step(self):
+        # فرض ساده: پاسخ‌پذیری کاهش یابد اگر قرنطینه باشد
+        if self.quarantined:
+            self.responsiveness *= 0.7
+            self.response_delay += 1
+        else:
+            self.responsiveness = min(1.0, self.responsiveness + 0.1)
+            self.response_delay = 0
+        # شبیه‌سازی رشد مسیرهای جدید اگر پاداش داده شده باشد
+        if self.rewarded:
+            self.path_variability = min(10, self.path_variability + 1)
+        else:
+            # ممکن است مسیرهای جدید کاهش یابد اگر قرنطینه باشد
+            self.path_variability = max(1, self.path_variability - 0.2)
+
+def simulate_network(steps=20):
+    alpha = (1.0, 1.2, 0.5, 0.8)
+    nodes = [StarNode(i, position=random.uniform(0,1), initial_paths=random.uniform(1,5)) for i in range(10)]
+
+    for step in range(steps):
+        print(f"--- گام {step} ---")
+        for node in nodes:
+            node.update_score(alpha)
+            node.evaluate_quarantine()
+            node.apply_reward()
+            node.step()
+            status = "قرنطینه" if node.quarantined else ("پاداش" if node.rewarded else "عادی")
+            print(f"گره {node.id}: امتیاز={node.score:.2f}, پاسخ‌پذیری={node.responsiveness:.2f}, مسیرها={node.path_variability:.2f}, وضعیت={status}")
+
+if __name__ == "__main__":
+    simulate_network()
