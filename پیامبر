@@ -1,0 +1,195 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# --- بخش تعریف اعضا و پیامبر ---
+
+SILENCE = -1
+
+def combine_bits(a, b):
+    if a == SILENCE and b == SILENCE:
+        return 'هیچ'
+    elif (a == 0 and b == 1) or (a == 1 and b == 0):
+        return 'تعامل'
+    elif (a == 0 and b == SILENCE) or (a == SILENCE and b == 0):
+        return 'نیمه فعال'
+    elif (a == 1 and b == SILENCE) or (a == SILENCE and b == 1):
+        return 'نیمه خاموش'
+    else:
+        return 'نامشخص'
+
+def harmonic_wave(t, combo):
+    if combo == 'هیچ':
+        return np.zeros_like(t)
+    elif combo == 'تعامل':
+        return np.sin(2 * np.pi * 5 * t)
+    elif combo == 'نیمه فعال':
+        return 0.5 * np.sin(2 * np.pi * 3 * t)
+    elif combo == 'نیمه خاموش':
+        return 0.5 * np.sin(2 * np.pi * 7 * t)
+    else:
+        return np.zeros_like(t)
+
+class Member:
+    def __init__(self, id, state):
+        self.id = id
+        self.state = state  # 0,1 or SILENCE
+
+    def send_state(self):
+        return self.state
+
+class Prophet:
+    def __init__(self, members):
+        self.members = members
+
+    def collect_states(self):
+        return [m.send_state() for m in self.members]
+
+    def analyze(self):
+        states = self.collect_states()
+        combos = []
+        for i in range(len(states)-1):
+            combos.append(combine_bits(states[i], states[i+1]))
+        return combos
+
+    def harmonic_signal(self, t):
+        combos = self.analyze()
+        total_wave = np.zeros_like(t)
+        for c in combos:
+            total_wave += harmonic_wave(t, c)
+        return total_wave
+
+# --- بخش الگوریتم قرنطینه و پاداش ---
+
+class StarNode:
+    def __init__(self, id, state):
+        self.id = id
+        self.state = state  # 0,1 or SILENCE
+        self.path_history = []  # ثبت مسیرهای دسترسی
+        self.response_times = []
+        self.position_index = None  # در ستاره مرکزی یا فرعی
+        self.expansion_alignment = 0.0  # مقدار هم‌جهتی
+        self.score = 0.0
+        self.quarantined = False
+        self.rewarded = False
+
+    def update_path(self, path_id):
+        self.path_history.append(path_id)
+        if len(self.path_history) > 100:
+            self.path_history.pop(0)
+
+    def update_response(self, response_delay):
+        self.response_times.append(response_delay)
+        if len(self.response_times) > 50:
+            self.response_times.pop(0)
+
+    def calculate_score(self, alpha=(0.25, 0.25, 0.25, 0.25)):
+        # تنوع مسیر (شمار مسیرهای غیرتکراری)
+        unique_paths = len(set(self.path_history)) if self.path_history else 0
+        total_paths = len(self.path_history) if self.path_history else 1
+        V = unique_paths / total_paths
+
+        # پاسخ‌پذیری (معکوس میانگین تاخیر پاسخ)
+        if self.response_times:
+            R = 1 / (np.mean(self.response_times) + 1e-6)
+        else:
+            R = 0
+
+        # شاخص موقعیت (برای نمونه، فرضی عدد بین 0 و 1)
+        S = self.position_index if self.position_index is not None else 0.5
+
+        # هم‌جهتی انشعاب (عدد بین 0 و 1)
+        E = self.expansion_alignment
+
+        self.score = alpha[0]*V + alpha[1]*R + alpha[2]*S + alpha[3]*E
+        return self.score
+
+    def check_quarantine(self, redundancy_threshold=0.75, response_delay_threshold=0.5):
+        if self.quarantined:
+            return True
+        # محاسبه درصد مسیرهای تکراری
+        if len(self.path_history) > 0:
+            unique_paths = len(set(self.path_history))
+            redundancy = 1 - unique_paths/len(self.path_history)
+        else:
+            redundancy = 0
+        # میانگین پاسخ‌پذیری
+        mean_delay = np.mean(self.response_times) if self.response_times else 0
+
+        if redundancy > redundancy_threshold or mean_delay > response_delay_threshold:
+            self.quarantined = True
+        return self.quarantined
+
+    def assign_reward(self):
+        # نمونه شرط ساده: اگر امتیاز بالاتر از 0.7 باشد
+        if self.score > 0.7:
+            self.rewarded = True
+        else:
+            self.rewarded = False
+        return self.rewarded
+
+# --- بخش رسم ستاره با توالی نامتوالی ---
+
+def plot_star_sequence(points_count=5, sequence=None):
+    angles = np.linspace(0, 2*np.pi, points_count, endpoint=False)
+    x = np.cos(angles)
+    y = np.sin(angles)
+
+    plt.figure(figsize=(6,6))
+    plt.scatter(x, y, s=150, c='red')
+    for i, (xi, yi) in enumerate(zip(x, y), 1):
+        plt.text(xi*1.15, yi*1.15, str(i), fontsize=14, ha='center', va='center', weight='bold')
+
+    if sequence:
+        seq_points = [p-1 for p in sequence]
+        for i in range(len(seq_points)-1):
+            start = seq_points[i]
+            end = seq_points[i+1]
+            plt.plot([x[start], x[end]], [y[start], y[end]], 'b-', lw=3, alpha=0.7)
+
+        # برای نمایش بازگشت به مرکز (مثلا شماره 3)
+        center = 2  # اگر مرکز شماره 3 باشد (index=2)
+        if seq_points[-1] != center:
+            plt.plot([x[seq_points[-1]], x[center]], [y[seq_points[-1]], y[center]], 'g--', lw=2, alpha=0.5)
+
+    plt.axis('equal')
+    plt.axis('off')
+    plt.title('رسم ستاره با توالی نامتوالی')
+    plt.show()
+
+# --- نمونه اجرا و ترکیب کل ---
+
+if __name__ == "__main__":
+    # تعریف اعضا با حالات مختلف
+    members = [Member(1, 0), Member(2, 1), Member(3, SILENCE), Member(4, 0), Member(5, 1)]
+    prophet = Prophet(members)
+
+    t = np.linspace(0, 1, 500)
+    wave = prophet.harmonic_signal(t)
+
+    plt.plot(t, wave)
+    plt.title('موج هارمونیک ترکیبی بر اساس حالت اعضا')
+    plt.xlabel('زمان')
+    plt.ylabel('دامنه')
+    plt.show()
+
+    # نمونه StarNodes (گره‌های ستاره‌ای)
+    star_nodes = []
+    for i, mem in enumerate(members, 1):
+        node = StarNode(i, mem.state)
+        node.position_index = (i-1) / (len(members)-1)  # شاخص موقعیت نرمال شده
+        # شبیه‌سازی مسیرهای فرضی و زمان‌های پاسخ
+        paths = [1,2,3,2,1] if i % 2 == 0 else [1,1,1,1,1]
+        node.path_history = paths
+        response_delays = np.random.uniform(0.1, 0.6, size=len(paths))
+        node.response_times = list(response_delays)
+        node.expansion_alignment = np.random.rand()
+        node.calculate_score()
+        quarantined = node.check_quarantine()
+        rewarded = node.assign_reward()
+        star_nodes.append(node)
+
+        print(f"گره {i}: امتیاز={node.score:.3f}، قرنطینه={quarantined}، پاداش={rewarded}")
+
+    # رسم ستاره با توالی نامتوالی (مرکز فرضی 3)
+    sequence = [1, 4, 2, 5, 3, 1]
+    plot_star_sequence(points_count=5, sequence=sequence)
