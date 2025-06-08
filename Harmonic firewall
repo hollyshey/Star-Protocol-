@@ -1,0 +1,83 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+SILENCE = -1
+
+# توابع پایه ترکیب و تولید موج
+def combine_bits(a, b):
+    if a == SILENCE and b == SILENCE:
+        return 'هیچ'
+    elif a == 0 and b == 1 or a == 1 and b == 0:
+        return 'تعامل'
+    elif (a == 0 and b == SILENCE) or (a == SILENCE and b == 0):
+        return 'نیمه فعال'
+    elif (a == 1 and b == SILENCE) or (a == SILENCE and b == 1):
+        return 'نیمه خاموش'
+    else:
+        return 'نامشخص'
+
+def harmonic_wave(t, combo):
+    if combo == 'هیچ':
+        return np.zeros_like(t)
+    elif combo == 'تعامل':
+        return np.sin(2 * np.pi * 5 * t)
+    elif combo == 'نیمه فعال':
+        return 0.5 * np.sin(2 * np.pi * 3 * t)
+    elif combo == 'نیمه خاموش':
+        return 0.5 * np.sin(2 * np.pi * 7 * t)
+    else:
+        return np.zeros_like(t)
+
+# گره‌های شبکه
+class Member:
+    def __init__(self, id, state):
+        self.id = id
+        self.state = state  # 0, 1, یا SILENCE
+
+    def send_state(self):
+        return self.state
+
+# تحلیلگر مرکزی (پیامبر/ستاره‌مرکز)
+class Prophet:
+    def __init__(self, members):
+        self.members = members
+
+    def collect_states(self):
+        return [m.send_state() for m in self.members]
+
+    def analyze_combos(self):
+        states = self.collect_states()
+        combos = []
+        for i in range(len(states) - 1):
+            a, b = states[i], states[(i + 1) % len(states)]  # پیوسته ولی چرخشی
+            combos.append(combine_bits(a, b))
+        return combos
+
+    def harmonic_signal(self, t):
+        combos = self.analyze_combos()
+        total_wave = np.zeros_like(t)
+        for c in combos:
+            wave = harmonic_wave(t, c)
+            # فایروال هارمونیک: حذف مسیرهایی با نویز زیاد یا بی‌فرکانس
+            if np.max(np.abs(wave)) < 0.1 or np.isnan(np.sum(wave)):
+                continue  # حذف مسیر مشکوک
+            total_wave += wave
+        return total_wave
+
+# تست با ورودی‌های بینظم و نامحدود
+if __name__ == "__main__":
+    t = np.linspace(0, 1, 1000)
+    raw_inputs = [0, 1, SILENCE, 0, 1, SILENCE, 1, 0, 1, SILENCE, SILENCE, 0, 1, 1, 0]
+
+    # ساختن گره‌ها از ورودی‌ها
+    members = [Member(i, s) for i, s in enumerate(raw_inputs)]
+
+    prophet = Prophet(members)
+    wave = prophet.harmonic_signal(t)
+
+    plt.plot(t, wave)
+    plt.title("هارمونی ستاره‌ای با ورودی نامتوالی و فایروال")
+    plt.xlabel("زمان")
+    plt.ylabel("دامنه")
+    plt.grid(True)
+    plt.show()
