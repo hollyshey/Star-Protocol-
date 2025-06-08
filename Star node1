@@ -1,0 +1,49 @@
+import numpy as np
+import hashlib
+import matplotlib.pyplot as plt
+
+class StarNode:
+    def __init__(self, seed, freq=1.0):
+        """
+        یک نود ستاره‌ای که موج سینوسی و کسینوسی هارمونیک تولید می‌کند و با هر پالس فرکانس را تغییر می‌دهد.
+        
+        :param seed: رشته ورودی برای تولید هش منحصر به فرد
+        :param freq: فرکانس پایه موج
+        """
+        self.seed = seed
+        self.freq = freq
+        self.time = np.linspace(0, 1, 1024)
+        self.internal_wave = self._generate_wave()
+        self.clock_state = self._hash_clock()
+
+    def _generate_wave(self):
+        # تولید موج ترکیبی سینوس و کسینوس هارمونیک
+        wave = np.sin(2 * np.pi * self.freq * self.time)
+        mod = np.cos(2 * np.pi * self.freq * 1.618 * self.time)
+        return wave + mod
+
+    def _hash_clock(self):
+        # محاسبه هش SHA-256 از موج داخلی و seed
+        data = (str(self.internal_wave) + self.seed).encode()
+        return hashlib.sha256(data).hexdigest()
+
+    def pulse(self):
+        # افزایش فرکانس با ضریب تون موسیقی (یک نیم‌پرده بالا)
+        self.freq *= 1.059
+        self.internal_wave = self._generate_wave()
+        self.clock_state = self._hash_clock()
+        return self.clock_state
+
+    def plot_wave(self):
+        # رسم موج داخلی فعلی
+        plt.plot(self.time, self.internal_wave)
+        plt.title(f"StarNode Wave at freq = {self.freq:.3f} Hz")
+        plt.xlabel("Time")
+        plt.ylabel("Amplitude")
+        plt.show()
+
+# نمونه‌سازی و تست
+star = StarNode(seed="∞")
+for i in range(5):
+    print(f"[PULSE {i}] 🔁  StarHash: {star.pulse()}")
+    star.plot_wave()
