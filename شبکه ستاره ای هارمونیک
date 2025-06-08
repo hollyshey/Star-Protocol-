@@ -1,0 +1,80 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.fft import fft, ifft
+import random
+
+class HarmonicLayer:
+    def __init__(self, degree, size, clock_rate=1.0):
+        self.degree = degree
+        self.size = size
+        self.clock_rate = clock_rate
+        self.values = np.random.rand(size)
+        self.weights = np.ones(size)
+        self.banned = np.zeros(size, dtype=bool)
+    
+    def update(self, neighbors, integral_mode=False):
+        if integral_mode:
+            freq_domain = fft(self.values * self.weights)
+            freq_domain = freq_domain * (1.0 / (np.arange(1, len(freq_domain)+1)**self.degree))
+            self.values = np.real(ifft(freq_domain))
+        else:
+            new_vals = (self.values + neighbors) / 2.0
+            new_vals[self.banned] *= 0.1
+            self.values = (1 - self.clock_rate)*self.values + self.clock_rate*new_vals
+            self.values = np.clip(self.values, 0, 1)
+    
+    def ban_redundant(self, threshold=0.95):
+        # برای سادگی حذف بایکوت وابسته به همبستگی گره‌ها حذف شد یا ساده شد
+        pass
+    
+    def get_weighted_sum(self):
+        return np.sum(self.values * self.weights)
+
+class StarNetwork:
+    def __init__(self, layers):
+        self.layers = []
+        self.layer_sizes = [2**i for i in range(layers)]
+        self.clock_base = 0.5
+        for i, size in enumerate(self.layer_sizes):
+            degree = (i % 3) + 1
+            clock_rate = self.clock_base / (i+1)
+            self.layers.append(HarmonicLayer(degree, size, clock_rate))
+        self.player_index = 0
+
+    def get_neighbors(self, layer_index):
+        layer = self.layers[layer_index]
+        size = layer.size
+        neighbors = np.zeros(size)
+        for j in range(size):
+            left = layer.values[(j - 1) % size]
+            right = layer.values[(j + 1) % size]
+            neighbors[j] = (left + right) / 2
+            if layer_index > 0:
+                upper_layer = self.layers[layer_index - 1]
+                upper_idx = j // 2
+                neighbors[j] += upper_layer.values[upper_idx] / 2
+            if layer_index < len(self.layers) - 1:
+                lower_layer = self.layers[layer_index + 1]
+                lower_idx = (j * 2) % lower_layer.size
+                neighbors[j] += lower_layer.values[lower_idx] / 2
+            neighbors[j] /= 2
+        return neighbors
+
+    def step(self):
+        for i, layer in enumerate(self.layers):
+            neighbors = self.get_neighbors(i)
+            integral_mode = (layer.degree == 2)
+            layer.update(neighbors, integral_mode)
+        # می‌توان کلاک یا پارامترهای دینامیک را اینجا به‌روزرسانی کرد
+
+    def display(self):
+        for i, layer in enumerate(self.layers):
+            print(f"Layer {i} values: {layer.values}")
+
+# اجرای نمونه
+star_net = StarNetwork(layers=4)
+steps = 10
+for step in range(steps):
+    star_net.step()
+    star_net.display()
+    print("-" * 40)
