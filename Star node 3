@@ -1,0 +1,115 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import hashlib
+
+SILENCE = -1
+
+def combine_bits(a, b):
+    if a == SILENCE and b == SILENCE:
+        return 'هیچ'
+    elif a == 0 and b == 1 or a == 1 and b == 0:
+        return 'تعامل'
+    elif (a == 0 and b == SILENCE) or (a == SILENCE and b == 0):
+        return 'نیمه فعال'
+    elif (a == 1 and b == SILENCE) or (a == SILENCE and b == 1):
+        return 'نیمه خاموش'
+    else:
+        return 'نامشخص'
+
+def harmonic_wave(t, combo):
+    if combo == 'هیچ':
+        return np.zeros_like(t)
+    elif combo == 'تعامل':
+        return np.sin(2 * np.pi * 5 * t)
+    elif combo == 'نیمه فعال':
+        return 0.5 * np.sin(2 * np.pi * 3 * t)
+    elif combo == 'نیمه خاموش':
+        return 0.5 * np.sin(2 * np.pi * 7 * t)
+    else:
+        return np.zeros_like(t)
+
+class Member:
+    def __init__(self, id, state):
+        self.id = id
+        self.state = state  # 0,1 or SILENCE
+
+    def send_state(self):
+        return self.state
+
+class StarNode:
+    def __init__(self, seed, freq=1.0):
+        self.seed = seed
+        self.freq = freq
+        self.time = np.linspace(0, 1, 500)
+        self.internal_wave = self._generate_wave()
+        self.clock_state = self._hash_clock()
+
+    def _generate_wave(self):
+        wave = np.sin(2 * np.pi * self.freq * self.time)
+        mod = np.cos(2 * np.pi * self.freq * 1.618 * self.time)
+        return wave + mod
+
+    def _hash_clock(self):
+        data = (str(self.internal_wave) + self.seed).encode()
+        return hashlib.sha256(data).hexdigest()
+
+    def send_state(self):
+        # به جای عدد، موج را برمی‌گرداند
+        return self.internal_wave
+
+class Prophet:
+    def __init__(self, members):
+        self.members = members
+
+    def collect_states(self):
+        return [m.send_state() for m in self.members]
+
+    def analyze(self):
+        states = self.collect_states()
+        combos = []
+        for i in range(len(states)-1):
+            a, b = states[i], states[i+1]
+
+            # اگر حالت‌ها عددی هستند (0,1,SILENCE)
+            if isinstance(a, int) and isinstance(b, int):
+                combos.append(combine_bits(a, b))
+            else:
+                # اگر حالت‌ها موج هستند، از جمع جبری یا معیار دلخواه استفاده کن
+                combined_wave = np.zeros_like(a)
+                if isinstance(a, np.ndarray):
+                    combined_wave += a
+                if isinstance(b, np.ndarray):
+                    combined_wave += b
+                combos.append(combined_wave)
+        return combos
+
+    def harmonic_signal(self, t):
+        combos = self.analyze()
+        total_wave = np.zeros_like(t)
+        for c in combos:
+            if isinstance(c, str):
+                total_wave += harmonic_wave(t, c)
+            else:
+                # موج numpy، مستقیماً جمع می‌کنیم
+                total_wave += c
+        return total_wave
+
+# نمونه اجرا
+if __name__ == "__main__":
+    t = np.linspace(0, 1, 500)
+
+    # اعضا: دو عضو عددی و یک StarNode موج‌ساز
+    members = [
+        Member(1, 0),
+        Member(2, 1),
+        StarNode(seed="∞", freq=5)
+    ]
+
+    prophet = Prophet(members)
+    wave = prophet.harmonic_signal(t)
+
+    plt.plot(t, wave)
+    plt.title('هارمونی پیامبر شبکه با StarNode')
+    plt.xlabel('زمان')
+    plt.ylabel('دامنه')
+    plt.show()
