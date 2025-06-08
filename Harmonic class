@@ -1,0 +1,176 @@
+import numpy as np
+import random
+from scipy.fft import fft, ifft
+
+# کلاس گره هارمونیک با کلاک دینامیک و سطح هارمونی
+class HarmonicNode:
+    def __init__(self, id):
+        self.id = id
+        self.state = random.choice([0,1])
+        self.clock = 1.0
+        self.harmony_level = 0.5
+        self.banned = False
+
+    def process(self, input_signal):
+        if input_signal == 1:
+            self.harmony_level += 0.1 * self.clock
+        elif input_signal == 0:
+            self.harmony_level -= 0.05 * self.clock
+        else:  # سکوت
+            self.harmony_level *= 0.95
+        # تغییر دینامیک کلاک نمایی یا لگاریتمی (با نسبت طلایی)
+        phi = 1.618
+        self.clock *= (1 + 0.01 * (random.random() - 0.5)) * (phi / (1 + abs(self.harmony_level - 0.5)))
+        self.harmony_level = np.clip(self.harmony_level, 0, 1)
+
+    def predict(self):
+        return 1 if self.harmony_level > 0.7 else 0
+
+# کلاس لایه هارمونیک (با درجه تابع و به روزرسانی مبتنی بر فوریه)
+class HarmonicLayer:
+    def __init__(self, degree, size, clock_rate=1.0):
+        self.degree = degree
+        self.size = size
+        self.clock_rate = clock_rate
+        self.values = np.random.rand(size)
+        self.weights = np.ones(size)
+        self.banned = np.zeros(size, dtype=bool)
+
+    def update(self, neighbors, integral_mode=False):
+        if integral_mode:
+            freq_domain = fft(self.values * self.weights)
+            freq_domain = freq_domain * (1.0 / (np.arange(1, len(freq_domain)+1)**self.degree))
+            self.values = np.real(ifft(freq_domain))
+        else:
+            new_vals = (self.values + neighbors) / 2.0
+            new_vals[self.banned] *= 0.1
+            self.values = (1 - self.clock_rate)*self.values + self.clock_rate*new_vals
+            self.values = np.clip(self.values, 0, 1)
+
+    def ban_redundant(self, threshold=0.95):
+        # برای بایکوت گره‌های تکراری
+        if self.size == 1:
+            return
+        correlation = np.corrcoef(np.vstack([self.values]*self.size))
+        redundant = np.abs(correlation - 1) < (1 - threshold)
+        for i in range(self.size):
+            if np.sum(redundant[i]) > (self.size * threshold):
+                self.banned[i] = True
+                self.weights[i] *= 0.5
+
+    def get_weighted_sum(self):
+        return np.sum(self.values * self.weights)
+
+# کلاس شبکه ستاره‌ای با چند لایه هارمونیکی
+class StarNetwork:
+    def __init__(self, layers):
+        self.layers = []
+        self.layer_sizes = [2**i for i in range(layers)]
+        self.clock_base = 0.5
+        for i, size in enumerate(self.layer_sizes):
+            degree = (i % 3) + 1
+            clock_rate = self.clock_base / (i+1)
+            self.layers.append(HarmonicLayer(degree, size, clock_rate))
+        self.nodes = [HarmonicNode(i) for i in range(sum(self.layer_sizes))]
+        self.player_index = 0
+        self.phi = 1.618  # نسبت طلایی برای کلاک دینامیک
+
+    def get_neighbors(self, layer_index):
+        layer = self.layers[layer_index]
+        size = layer.size
+        neighbors = np.zeros(size)
+        for j in range(size):
+            left = layer.values[(j - 1) % size]
+            right = layer.values[(j + 1) % size]
+            neighbors[j] = (left + right) / 2
+            if layer_index > 0:
+                upper_layer = self.layers[layer_index - 1]
+                upper_idx = j // 2
+                neighbors[j] += upper_layer.values[upper_idx] / 2
+            if layer_index < len(self.layers) - 1:
+                lower_layer = self.layers[layer_index + 1]
+                lower_idx = (j * 2) % lower_layer.size
+                neighbors[j] += lower_layer.values[lower_idx] / 2
+            neighbors[j] /= 2
+        return neighbors
+
+    def map_index_to_layer_node(self, index):
+        cum_sizes = np.cumsum(self.layer_sizes)
+        layer_id = np.searchsorted(cum_sizes, index, side='right')
+        if layer_id == 0:
+            node_id = index
+        else:
+            node_id = index - cum_sizes[layer_id - 1]
+        return layer_id, node_id
+
+    def dynamic_clock_adjustment(self):
+        # تحلیل بازه سکوت و نرخ تصادف و تغییر کلاک نمایی یا لگاریتمی
+        for node in self.nodes:
+            silence_period = random.randint(0, 5)
+            # تغییر نمایی یا لگاریتمی
+            if silence_period > 2:
+                node.clock *= np.exp(-0.05 * silence_period)
+            else:
+                node.clock *= np.log1p(1 + silence_period)
+            node.clock = np.clip(node.clock, 0.1, 2.0)
+
+    def step(self, input_signal=None):
+        # 1. بروزرسانی لایه‌ها
+        for i, layer in enumerate(self.layers):
+            neighbors = self.get_neighbors(i)
+            integral_mode = (layer.degree == 2)
+            layer.update(neighbors, integral_mode)
+            layer.ban_redundant()
+
+        # 2. تعامل گره‌ها با کلاک دینامیک
+        self.dynamic_clock_adjustment()
+
+        # 3. بروزرسانی گره‌ها بر اساس ورودی و پیش‌بینی
+        for node in self.nodes:
+            node.process(input_signal)
+
+        # 4. تعامل بازیکن (بازنویسی انتخابی لایه‌ها)
+        total_size = sum(self.layer_sizes)
+        current_player = self.player_index % total_size
+        layer_id, node_id = self.map_index_to_layer_node(current_player)
+        influence = 0.05 * (1 if input_signal == 1 else -1 if input_signal == 0 else 0)
+        self.layers[layer_id].values[node_id] = np.clip(self.layers[layer_id].values[node_id] + influence, 0, 1)
+        self.player_index += 1
+
+    def get_network_state(self):
+        state = []
+        for node in self.nodes:
+            state.append(node.predict())
+        return state
+
+    def run_simulation(self, inputs, steps=50):
+        for t in range(steps):
+            input_signal = inputs[t % len(inputs)] if inputs is not None else None
+            self.step(input_signal)
+            state = self.get_network_state()
+            print(f"Step {t}: Network state predictions: {state}")
+
+# نمادها و رفتارهای رفتاری برای تعاملات (↑ ↓ ← → ○)
+class BehavioralSequence:
+    def __init__(self, sequence):
+        self.sequence = sequence  # رشته ای از نمادها مثل "↑←○→↓"
+
+    def interpret(self):
+        meanings = {
+            '↑': "حرکت به جلو",
+            '↓': "عقب‌نشینی",
+            '←': "تعامل با همسایه سمت چپ",
+            '→': "تعامل با همسایه سمت راست",
+            '○': "سکوت / توقف / ثبت وضعیت"
+        }
+        interpreted = [meanings.get(ch, "نامشخص") for ch in self.sequence]
+        return interpreted
+
+# نمونه اجرا
+if __name__ == "__main__":
+    network = StarNetwork(layers=4)
+    input_seq = [1, 0, None, 1, 1, 0, None, 0, 1]
+    network.run_simulation(input_seq, steps=30)
+
+    seq = BehavioralSequence("↑←○→↓")
+    print("تفسیر توالی رفتاری:", seq.interpret())
