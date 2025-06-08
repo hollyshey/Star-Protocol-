@@ -1,0 +1,7 @@
+def preprocess_harmonic(data_sequence):
+    states = [live_input_to_state(d) for d in data_sequence]
+    wave = prophet_from_states(states).harmonic_signal(t)
+    if np.max(wave) < noise_floor:
+        return 'Reject'
+    else:
+        return 'Accept'
