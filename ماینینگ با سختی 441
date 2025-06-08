@@ -1,0 +1,28 @@
+import hashlib
+import time
+
+def mine_block(data, difficulty=441):
+    prefix = '0' * (difficulty // 4)  # هر 4 بیت = 1 هگز صفر، برای ساده سازی
+    nonce = 0
+    start_time = time.time()
+
+    while True:
+        text = f"{data}{nonce}"
+        hash_result = hashlib.sha256(text.encode()).hexdigest()
+        if hash_result.startswith(prefix):
+            elapsed = time.time() - start_time
+            print(f"Nonce found: {nonce}")
+            print(f"Hash: {hash_result}")
+            print(f"Time elapsed: {elapsed:.2f} seconds")
+            return nonce, hash_result
+        nonce += 1
+        if nonce % 1000000 == 0:
+            print(f"Still mining... nonce={nonce}")
+
+if __name__ == "__main__":
+    # داده ورودی مثلاً بلاک اطلاعات
+    block_data = "Star Raven Mining Example"
+    
+    # سختی واقعی 441 بیت خیلی زیاد و غیرعملی برای این کد ساده است
+    # سختی رو پایین‌تر بگیرید مثلا 4، 5 یا 6 برای تست اجرا
+    mine_block(block_data, difficulty=6)
