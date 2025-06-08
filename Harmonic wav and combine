@@ -1,0 +1,78 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# تعریف حالت سکوت
+SILENCE = -1
+
+def combine_bits(a, b):
+    if a == SILENCE and b == SILENCE:
+        return 'هیچ'        # سکوت و سکوت = هیچ
+    elif (a == 0 and b == 1) or (a == 1 and b == 0):
+        return 'تعامل'      # 0 و 1
+    elif (a == 0 and b == SILENCE) or (a == SILENCE and b == 0):
+        return 'نیمه فعال'  # 0 و سکوت
+    elif (a == 1 and b == SILENCE) or (a == SILENCE and b == 1):
+        return 'نیمه خاموش' # 1 و سکوت
+    else:
+        return 'نامشخص'
+
+def harmonic_wave(t, combo):
+    if combo == 'هیچ':
+        return np.zeros_like(t)
+    elif combo == 'تعامل':
+        return np.sin(2 * np.pi * 5 * t)
+    elif combo == 'نیمه فعال':
+        return 0.5 * np.sin(2 * np.pi * 3 * t)
+    elif combo == 'نیمه خاموش':
+        return 0.5 * np.sin(2 * np.pi * 7 * t)
+    else:
+        return np.zeros_like(t)
+
+class Member:
+    def __init__(self, id, state):
+        self.id = id
+        self.state = state  # 0, 1 or SILENCE
+
+    def send_state(self):
+        return self.state
+
+class Prophet:
+    def __init__(self, members):
+        self.members = members
+
+    def collect_states(self):
+        return [m.send_state() for m in self.members]
+
+    def analyze(self):
+        states = self.collect_states()
+        combos = []
+        for i in range(len(states)-1):
+            combos.append(combine_bits(states[i], states[i+1]))
+        return combos
+
+    def harmonic_signal(self, t):
+        combos = self.analyze()
+        total_wave = np.zeros_like(t)
+        for combo in combos:
+            total_wave += harmonic_wave(t, combo)
+        return total_wave
+
+if __name__ == "__main__":
+    t = np.linspace(0, 1, 500)
+
+    # تعریف اعضا با حالت‌های مختلف
+    members = [
+        Member(1, 0),
+        Member(2, 1),
+        Member(3, SILENCE),
+        Member(4, 0)
+    ]
+
+    prophet = Prophet(members)
+    wave = prophet.harmonic_signal(t)
+
+    plt.plot(t, wave)
+    plt.title('موج هارمونی پیامبر شبکه')
+    plt.xlabel('زمان')
+    plt.ylabel('دامنه')
+    plt.show()
