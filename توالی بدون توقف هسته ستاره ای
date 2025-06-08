@@ -1,0 +1,17 @@
+def is_valid_next(current, candidate):
+    # فرض کن ۵ نقطه روی دایره و مجاورها 1-2, 2-3, 3-4, 4-5, 5-1 هستند
+    adjacent = {1:[2,5], 2:[1,3], 3:[2,4], 4:[3,5], 5:[4,1]}
+    return candidate not in adjacent[current]
+
+def generate_star_sequence(length=30):
+    import random
+    sequence = [random.randint(1,5)]
+    while len(sequence) < length:
+        current = sequence[-1]
+        candidates = [p for p in range(1,6) if is_valid_next(current, p)]
+        next_point = random.choice(candidates)
+        sequence.append(next_point)
+    return sequence
+
+seq = generate_star_sequence()
+print(seq)
