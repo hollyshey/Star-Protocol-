@@ -1,0 +1,61 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.linear_model import LinearRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+from scipy.stats import gaussian_kde
+
+# بارگذاری داده‌ها (مثلاً data.csv)
+data = pd.read_csv('data.csv')
+
+# نمایش خلاصه اولیه داده‌ها
+print(data.head())
+print(data.describe())
+
+# فرض بر این است که ستون‌ها X1، X2 و Y هستند
+X = data[['X1', 'X2']]
+y = data['Y']
+
+# تقسیم داده به آموزش و تست
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# ساخت و آموزش مدل رگرسیون خطی
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+# پیش‌بینی مقادیر روی داده تست
+y_pred = model.predict(X_test)
+
+# ارزیابی مدل با MSE
+mse = mean_squared_error(y_test, y_pred)
+print(f'Mean Squared Error: {mse}')
+
+# رسم نمودار واقعی vs پیش‌بینی شده
+plt.figure(figsize=(8,5))
+plt.scatter(y_test, y_pred, alpha=0.7)
+plt.xlabel('مقادیر واقعی')
+plt.ylabel('مقادیر پیش‌بینی شده')
+plt.title('رگرسیون خطی - واقعی در مقابل پیش‌بینی شده')
+plt.plot([y.min(), y.max()], [y.min(), y.max()], 'r--')
+plt.show()
+
+# رسم KDE برای ستون X1
+kde = gaussian_kde(data['X1'])
+x_vals = np.linspace(data['X1'].min(), data['X1'].max(), 1000)
+kde_vals = kde(x_vals)
+
+plt.figure(figsize=(8,5))
+plt.plot(x_vals, kde_vals, label='KDE برای X1')
+plt.title('نمودار تخمین چگالی هسته‌ای (KDE)')
+plt.xlabel('X1')
+plt.ylabel('چگالی احتمال')
+plt.legend()
+plt.show()
+
+# رسم نمودار جعبه‌ای Y نسبت به X2
+plt.figure(figsize=(8,5))
+sns.boxplot(x='X2', y='Y', data=data)
+plt.title('نمودار جعبه‌ای Y نسبت به X2')
+plt.show()
